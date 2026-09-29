@@ -1,0 +1,509 @@
+/*
+===========================================================
+PROJECT: Sales Analytics SQL
+DATABASE: MySQL
+FILE: Sales_Analytics_SQL_Analysis.sql
+===========================================================
+
+PROJECT PURPOSE
+---------------
+This SQL analysis was created to answer 25 business questions
+related to customers, products, orders, revenue, salespeople,
+regions, product categories, and customer performance.
+
+KEY SQL SKILLS USED
+-------------------
+- SELECT and filtering
+- Aggregate functions: COUNT, SUM, AVG
+- ROUND for numeric formatting
+- JOIN and LEFT JOIN
+- GROUP BY and HAVING
+- ORDER BY and LIMIT
+- Subqueries
+- CTE (Common Table Expression)
+- Date functions: DATE_FORMAT
+- Window functions: RANK() and AVG() OVER()
+- Revenue calculations using quantity, unit price, and discount
+
+BUSINESS AREAS ANALYZED
+-----------------------
+1. Customer and product overview
+2. Order volume and revenue
+3. Average Order Value (AOV)
+4. Product and customer revenue performance
+5. Regional revenue
+6. Repeat customers
+7. Product category performance
+8. Monthly revenue trends
+9. Salesperson performance
+10. High-value customers
+11. Customer order participation
+12. Product sales quantity
+13. Revenue rankings
+14. Customer revenue compared with average revenue
+15. Top customers by revenue, order count, and rank
+
+NOTE
+----
+The queries below are the original analysis questions and SQL
+logic provided for this project, organized for GitHub documentation.
+===========================================================
+*/
+
+
+-- =========================================================
+-- Q1. How many customers are present in the customer database?
+-- =========================================================
+SELECT COUNT(customer_name) AS total_customers
+FROM customers;
+
+
+-- =========================================================
+-- Q2. How many products are available in the product catalog?
+-- =========================================================
+SELECT COUNT(product_name) AS total_product
+FROM products;
+
+
+-- =========================================================
+-- Q3. What is the total number of orders placed by customers?
+-- =========================================================
+SELECT COUNT(*) AS total_orders
+FROM orders AS ORDR
+JOIN customers AS CUST
+    ON ORDR.customer_id = CUST.customer_id;
+
+
+-- =========================================================
+-- Q4. What is the total revenue generated from all orders?
+-- =========================================================
+SELECT ROUND(
+    SUM(quantity * unit_price * (1 - discount / 100)), 2
+) AS total_revenue
+FROM order_details;
+
+
+-- =========================================================
+-- Q5. What is the average order value (AOV) for all orders?
+-- =========================================================
+SELECT ROUND(
+    SUM(quantity * unit_price * (1 - discount / 100))
+    / COUNT(DISTINCT order_id), 2
+) AS aov
+FROM order_details;
+
+
+-- =========================================================
+-- Q6. Which 5 products generated the highest total revenue?
+-- =========================================================
+SELECT
+    PRD.product_name,
+    ROUND(
+        SUM(ORD.quantity * ORD.unit_price * (1 - ORD.discount / 100)), 2
+    ) AS total_revenue
+FROM products AS PRD
+JOIN order_details AS ORD
+    ON PRD.product_id = ORD.product_id
+GROUP BY PRD.product_id, PRD.product_name
+ORDER BY total_revenue DESC
+LIMIT 5;
+
+
+-- =========================================================
+-- Q7. Which 5 customers generated the highest total revenue?
+-- =========================================================
+SELECT
+    CST.customer_name,
+    ROUND(
+        SUM(ORDR.quantity * ORDR.unit_price * (1 - ORDR.discount / 100)), 2
+    ) AS total_revenue
+FROM customers AS CST
+LEFT JOIN orders AS ORD
+    ON CST.customer_id = ORD.customer_id
+JOIN order_details AS ORDR
+    ON ORD.order_id = ORDR.order_id
+GROUP BY CST.customer_name, CST.customer_id
+ORDER BY total_revenue DESC
+LIMIT 5;
+
+
+-- =========================================================
+-- Q8. Which region generated the highest total revenue?
+-- =========================================================
+SELECT
+    CST.region,
+    ROUND(
+        SUM(
+            ORDR.quantity * ORDR.unit_price
+            * (1 - ORDR.discount / 100)
+        ), 2
+    ) AS total_revenue
+FROM customers AS CST
+JOIN orders AS ORD
+    ON CST.customer_id = ORD.customer_id
+JOIN order_details AS ORDR
+    ON ORD.order_id = ORDR.order_id
+GROUP BY CST.region
+ORDER BY total_revenue DESC
+LIMIT 5;
+
+
+-- =========================================================
+-- Q9. How many customers have placed more than one order?
+-- =========================================================
+SELECT COUNT(*) AS customers_with_multiple_orders
+FROM (
+    SELECT customer_id
+    FROM orders
+    GROUP BY customer_id
+    HAVING COUNT(*) > 1
+) AS repeat_customers;
+
+
+-- =========================================================
+-- Q10. What is the total revenue generated by each product category?
+-- =========================================================
+SELECT
+    PRD.category,
+    ROUND(
+        SUM(
+            ORDR.quantity * ORDR.unit_price
+            * (1 - ORDR.discount / 100)
+        ), 2
+    ) AS total_revenue
+FROM products AS PRD
+JOIN order_details AS ORDR
+    ON PRD.product_id = ORDR.product_id
+GROUP BY PRD.category
+ORDER BY total_revenue DESC;
+
+
+-- =========================================================
+-- Q11. What is the monthly total revenue trend?
+-- =========================================================
+SELECT
+    DATE_FORMAT(ORDR.order_date, '%Y-%m') AS months,
+    ROUND(
+        SUM(
+            ORD.quantity * ORD.unit_price
+            * (1 - ORD.discount / 100)
+        ), 2
+    ) AS total_revenue
+FROM orders AS ORDR
+JOIN order_details AS ORD
+    ON ORDR.order_id = ORD.order_id
+GROUP BY months
+ORDER BY months ASC;
+
+
+-- =========================================================
+-- Q12. Which salesperson generated the highest total revenue?
+-- =========================================================
+SELECT
+    ORDR.salesperson AS sales_person,
+    ROUND(
+        SUM(
+            ORD.quantity * ORD.unit_price
+            * (1 - ORD.discount / 100)
+        ), 2
+    ) AS total_revenue
+FROM orders AS ORDR
+JOIN order_details AS ORD
+    ON ORDR.order_id = ORD.order_id
+GROUP BY sales_person
+ORDER BY total_revenue DESC
+LIMIT 1;
+
+
+-- =========================================================
+-- Q13. Which customers have generated more than ₹1,00,000
+--      in total revenue?
+-- =========================================================
+SELECT
+    CST.customer_name AS customer,
+    ROUND(
+        SUM(
+            ORD.quantity * ORD.unit_price
+            * (1 - ORD.discount / 100)
+        ), 2
+    ) AS total_revenue
+FROM customers AS CST
+JOIN orders AS ORDR
+    ON CST.customer_id = ORDR.customer_id
+JOIN order_details AS ORD
+    ON ORDR.order_id = ORD.order_id
+GROUP BY customer, ORDR.customer_id
+HAVING total_revenue > 100000
+ORDER BY total_revenue DESC;
+
+
+-- =========================================================
+-- Q14. What is the average revenue generated per customer?
+-- =========================================================
+SELECT ROUND(
+    SUM(
+        ORD.quantity * ORD.unit_price
+        * (1 - ORD.discount / 100)
+    ) / COUNT(DISTINCT CST.customer_id), 2
+) AS average_revenue_per_customer
+FROM customers AS CST
+JOIN orders AS ORDR
+    ON CST.customer_id = ORDR.customer_id
+JOIN order_details AS ORD
+    ON ORDR.order_id = ORD.order_id;
+
+
+-- =========================================================
+-- Q15. Which month generated the highest total revenue?
+-- =========================================================
+SELECT
+    DATE_FORMAT(ORDR.order_date, '%M') AS month,
+    ROUND(
+        SUM(
+            ORD.quantity * ORD.unit_price
+            * (1 - ORD.discount / 100)
+        ), 2
+    ) AS total_revenue
+FROM orders AS ORDR
+JOIN order_details AS ORD
+    ON ORDR.order_id = ORD.order_id
+GROUP BY month
+ORDER BY total_revenue DESC
+LIMIT 1;
+
+
+-- =========================================================
+-- Q16. Which customers have placed the highest number of orders?
+-- =========================================================
+SELECT
+    CST.customer_name AS customer,
+    COUNT(ORD.order_id) AS total_orders
+FROM customers AS CST
+JOIN orders AS ORD
+    ON CST.customer_id = ORD.customer_id
+GROUP BY customer
+ORDER BY total_orders DESC
+LIMIT 5;
+
+
+-- =========================================================
+-- Q17. Which customers have the highest total revenue and
+--      also placed at least 2 orders?
+-- =========================================================
+SELECT
+    CST.customer_name AS customer,
+    ROUND(
+        SUM(
+            ORDR.quantity * ORDR.unit_price
+            * (1 - ORDR.discount / 100)
+        ), 2
+    ) AS total_revenue,
+    COUNT(ORD.order_id) AS no_of_orders
+FROM customers AS CST
+JOIN orders AS ORD
+    ON CST.customer_id = ORD.customer_id
+JOIN order_details AS ORDR
+    ON ORD.order_id = ORDR.order_id
+GROUP BY customer
+HAVING no_of_orders >= 2
+ORDER BY total_revenue DESC
+LIMIT 5;
+
+
+-- =========================================================
+-- Q18. Which customers have never placed an order?
+-- =========================================================
+SELECT
+    CST.customer_name AS customer,
+    ORD.order_id AS customer_id
+FROM customers AS CST
+LEFT JOIN orders AS ORD
+    ON CST.customer_id = ORD.customer_id
+WHERE ORD.order_id IS NULL;
+
+
+-- =========================================================
+-- Q19. What percentage of customers have placed at least one order?
+-- =========================================================
+SELECT ROUND(
+    (
+        SELECT COUNT(DISTINCT customer_id)
+        FROM orders
+    ) * 100.0 /
+    (
+        SELECT COUNT(*)
+        FROM customers
+    ), 2
+) AS percentage_customers_with_orders;
+
+
+-- =========================================================
+-- Q20. Which product has the highest total quantity sold?
+-- =========================================================
+SELECT
+    PRD.product_name AS product,
+    SUM(ORD.quantity) AS total_quantity_sale
+FROM products AS PRD
+LEFT JOIN order_details AS ORD
+    ON PRD.product_id = ORD.product_id
+GROUP BY product
+ORDER BY total_quantity_sale DESC
+LIMIT 1;
+
+
+-- =========================================================
+-- Q21. Which products have never been ordered?
+-- =========================================================
+SELECT
+    PRD.product_name AS product,
+    ORD.order_id AS order_details
+FROM products AS PRD
+LEFT JOIN order_details AS ORD
+    ON PRD.product_id = ORD.product_id
+WHERE ORD.order_id IS NULL;
+
+
+-- =========================================================
+-- Q22. Which product generated the highest total revenue?
+-- =========================================================
+SELECT
+    PRD.product_name AS products,
+    ROUND(
+        SUM(
+            ORD.quantity * ORD.unit_price
+            * (1 - ORD.discount / 100)
+        ), 2
+    ) AS total_revenue
+FROM products AS PRD
+JOIN order_details AS ORD
+    ON PRD.product_id = ORD.product_id
+GROUP BY products
+ORDER BY total_revenue DESC
+LIMIT 1;
+
+
+-- =========================================================
+-- Q23. For each region, calculate total revenue and rank
+--      regions from highest to lowest revenue.
+-- =========================================================
+SELECT
+    CST.region AS regions,
+    ROUND(
+        SUM(
+            ORD.quantity * ORD.unit_price
+            * (1 - ORD.discount / 100)
+        ), 2
+    ) AS total_revenue,
+    RANK() OVER (
+        ORDER BY
+            ROUND(
+                SUM(
+                    ORD.quantity * ORD.unit_price
+                    * (1 - ORD.discount / 100)
+                )
+            ) DESC
+    ) AS rank_revenue
+FROM customers AS CST
+JOIN orders AS ORDR
+    ON CST.customer_id = ORDR.customer_id
+JOIN order_details AS ORD
+    ON ORDR.order_id = ORD.order_id
+GROUP BY regions
+ORDER BY total_revenue DESC;
+
+
+-- =========================================================
+-- Q24. For each customer, calculate total revenue and show
+--      the difference between their revenue and average customer revenue.
+-- =========================================================
+WITH customer_revenue AS (
+    SELECT
+        CST.customer_id,
+        CST.customer_name,
+        ROUND(
+            SUM(
+                ORD.quantity * ORD.unit_price
+                * (1 - ORD.discount / 100)
+            ), 2
+        ) AS total_revenue
+    FROM customers AS CST
+    JOIN orders AS ORDR
+        ON CST.customer_id = ORDR.customer_id
+    JOIN order_details AS ORD
+        ON ORDR.order_id = ORD.order_id
+    GROUP BY CST.customer_id, CST.customer_name
+)
+SELECT
+    customer_name,
+    total_revenue,
+    ROUND(AVG(total_revenue) OVER (), 2) AS avg_customer_revenue,
+    ROUND(
+        total_revenue - AVG(total_revenue) OVER (), 2
+    ) AS difference
+FROM customer_revenue
+ORDER BY total_revenue DESC;
+
+
+-- =========================================================
+-- Q25. Find the top 3 customers by revenue and show their
+--      revenue, number of orders, and rank.
+-- =========================================================
+SELECT
+    CST.customer_name,
+    SUM(ORD.quantity * ORD.unit_price) AS revenue,
+    COUNT(DISTINCT OD.order_id) AS number_of_orders,
+    RANK() OVER (
+        ORDER BY SUM(ORD.quantity * ORD.unit_price) DESC
+    ) AS customer_rank
+FROM customers AS CST
+JOIN orders AS OD
+    ON CST.customer_id = OD.customer_id
+JOIN order_details AS ORD
+    ON OD.order_id = ORD.order_id
+GROUP BY CST.customer_id, CST.customer_name
+ORDER BY revenue DESC
+LIMIT 3;
+
+
+/*
+===========================================================
+PROJECT SUMMARY
+===========================================================
+
+WHAT WAS ANALYZED
+-----------------
+- Customer base size
+- Product catalog size
+- Order volume
+- Total revenue
+- Average Order Value
+- Top products by revenue
+- Top customers by revenue
+- Regional revenue
+- Repeat customers
+- Category-wise revenue
+- Monthly revenue trend
+- Salesperson revenue
+- High-value customers
+- Average revenue per customer
+- Highest revenue month
+- Customer order volume
+- Customers with no orders
+- Customer order participation percentage
+- Product quantity sold
+- Products never ordered
+- Regional revenue ranking
+- Customer revenue versus average
+- Top 3 customers by revenue, orders, and rank
+
+BUSINESS PURPOSE
+----------------
+The analysis is designed to help understand sales performance,
+customer behavior, product performance, regional performance,
+and revenue trends using MySQL.
+
+===========================================================
+END OF ANALYSIS
+===========================================================
+*/
+
